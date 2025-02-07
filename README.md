@@ -1,4 +1,4 @@
-# CC Project: DART
+# MetaML v2
 
 ## Installation
 
@@ -21,7 +21,7 @@ __Preparation:__
       ```
 3. Clone this repository:
    ```bash
-    git clone git@github.com:custom-computing-ic/ccdart.git
+    git clone git@github.com:custom-computing-ic/metaml2.git
    ```
 
 4. Speed-up anaconda solver (not required but highly recommended) by installing [libnamba](https://www.anaconda.com/blog/a-faster-conda-for-a-growing-community):
@@ -33,23 +33,14 @@ __Preparation:__
 
 5. Create project environment:
 
-   The script ``bin/dart`` must be used to create a DART project environment using Anaconda. Running the script without arguments shows the list of available project environments:
-
-   * `heterograph`: a library developed to support heterogeneous graph models
-   * `artisan`: a metaprogramming framework for C++ code descriptions
-   * `metaml_cpu`: a metaprogramming framework supporting reconfigurable ML models using HLS4ML
-   * `metaml`: same as above but with NVIDIA GPU support
-
-   To build an anaconda environment, pass the project name as argument, e.g.:
+   Run `conda.env.build` script:
       ```bash
-      bin/dart metaml # artisan or heterograph
+      bash conda.env.build # artisan or heterograph
       ```
-6. Documentation:
-
-   Technical and user (notebook) documentation can be found in: https://custom-computing-ic.github.io/ccdart/.
-
-   Additional material:
-   * `artisan`: check `projects/artisan/tutorial` for a set of examples.
+6. Activate project environment:
+   ```bash
+   conda activate metaml
+   ```
 
 
 
