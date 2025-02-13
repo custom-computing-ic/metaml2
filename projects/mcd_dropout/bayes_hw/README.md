@@ -1,3 +1,18 @@
+## Temp command:
+
+To search the optimal model of lenet on the mnist dataset with Bayesian OPT, run
+```
+bash run.sh
+```
+
+To train the optimal model of resnet on cifar10 dataset with Bayesian OPT, run
+```
+bash run_resnet.sh
+```
+
+To change the score function in the bayesian OPT search, check the link 420 in the file of train_bayesian_opt.py. 
+
+
 ## Useful tutorial
 The following tutorial is very useful when we buit the code.
 - [qkeras_tutorial](https://github.com/fastmachinelearning/hls4ml-tutorial/blob/master/part4_quantization.ipynb) 
