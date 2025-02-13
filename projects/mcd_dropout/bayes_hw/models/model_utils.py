@@ -61,3 +61,19 @@ def Top_Level_Model(args, model):
       raise NotImplementedError("dropout type is not supportred")
   model.compile(loss="categorical_crossentropy", optimizer=Adam(lr=args.lr), metrics=["accuracy"])
   return model 
+
+
+def check_sparsity(model):                                                                
+    allWeightsByLayer = {}                                                                
+                                                                                          
+    print("\n")                                                                           
+    print("Checking Sparity")                                                             
+    for layer in model.layers:                                                            
+        if (layer._name).find("batch")!=-1 or len(layer.get_weights())<1:                 
+            continue                                                                      
+        weights=layer.weights[0].numpy().flatten()                                        
+        allWeightsByLayer[layer._name] = weights                                          
+        print('Layer {}: % of zeros = {}'.format(layer._name,np.sum(weights==0)/np.size(weights)))
+
+
+
