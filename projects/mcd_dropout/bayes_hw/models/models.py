@@ -36,7 +36,7 @@ def lenet(args, num_layers):
     num_nonbayes_layer = num_layers - args.num_bayes_layer - 1
     # Lenet
     # Convolutional layer  
-    model.add(Conv2D(filters=20, kernel_size=(5,5), input_shape=(28,28,1), padding = "same", name="conv2d_1"))
+    model.add(Conv2D(filters=int(20*args.scale_factor), kernel_size=(5,5), input_shape=(28,28,1), padding = "same", name="conv2d_1"))
     model.add(Activation(activations.relu, name='relu1'))
     # Max-pooing layer with pooling window size is 2x2
     model.add(MaxPool2D(pool_size=(2,2), strides=2))
@@ -46,7 +46,7 @@ def lenet(args, num_layers):
     num_nonbayes_layer -= 1
 
     # Convolutional layer 
-    model.add(Conv2D(filters=20, kernel_size=(5,5), padding="same", name="conv2d_2"))
+    model.add(Conv2D(filters=int(20*args.scale_factor), kernel_size=(5,5), padding="same", name="conv2d_2"))
     model.add(Activation(activations.relu, name='relu2'))
     # Max-pooling layer 
     model.add(MaxPool2D(pool_size=(7,7), strides=7))
@@ -59,7 +59,7 @@ def lenet(args, num_layers):
     num_nonbayes_layer -= 1
 
     # The first fully connected layer 
-    model.add(Dense(100, name="fc_1"))
+    model.add(Dense(int(100*args.scale_factor), name="fc_1"))
     model.add(Activation(activations.relu, name='relu3'))
     # The output layer  
 
@@ -117,54 +117,55 @@ def ResidualBlock(x, filters, kernel_size, weight_decay, downsample=True):
     return out
 
 def ResNet18(classes, input_shape, args, num_bayes_loc=8, weight_decay=1e-4, base_filters=64):
+    new_base_filters = max(1, int(base_filters * args.scale_factor))
     input = Input(shape=input_shape)
     x = input
     mc_samples = args.mc_samples
     num_nonbayes_layer = num_bayes_loc - args.num_bayes_layer - 1
     # x = conv2d_bn_relu(x, filters=64, kernel_size=(7, 7), weight_decay=weight_decay, strides=(2, 2))
     # x = MaxPool2D(pool_size=(3, 3), strides=(2, 2),  padding='same')(x)
-    x = conv2d_bn_relu(x, filters=base_filters, kernel_size=(3, 3), weight_decay=weight_decay, strides=(1, 1))
+    x = conv2d_bn_relu(x, filters=new_base_filters, kernel_size=(3, 3), weight_decay=weight_decay, strides=(1, 1))
 
     # # conv 2
-    x = ResidualBlock(x, filters=base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
+    x = ResidualBlock(x, filters=new_base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
     # Insert Bayeian Layer, can be mc dropout or mask ensumble layer
     if (num_nonbayes_layer < 0): x = Insert_Bayesian_Layer(args, x)
     num_nonbayes_layer -= 1
 
-    x = ResidualBlock(x, filters=base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
+    x = ResidualBlock(x, filters=new_base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
     # Insert Bayeian Layer, can be mc dropout or mask ensumble layer
     if (num_nonbayes_layer < 0): x = Insert_Bayesian_Layer(args, x)
     num_nonbayes_layer -= 1
 
     # # conv 3
-    x = ResidualBlock(x, filters=2*base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=True)
+    x = ResidualBlock(x, filters=2*new_base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=True)
     # Insert Bayeian Layer, can be mc dropout or mask ensumble layer
     if (num_nonbayes_layer < 0): x = Insert_Bayesian_Layer(args, x)
     num_nonbayes_layer -= 1
 
-    x = ResidualBlock(x, filters=2*base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
+    x = ResidualBlock(x, filters=2*new_base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
     # Insert Bayeian Layer, can be mc dropout or mask ensumble layer
     if (num_nonbayes_layer < 0): x = Insert_Bayesian_Layer(args, x)
     num_nonbayes_layer -= 1
 
     # # conv 4
-    x = ResidualBlock(x, filters=4*base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=True)
+    x = ResidualBlock(x, filters=4*new_base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=True)
     # Insert Bayeian Layer, can be mc dropout or mask ensumble layer
     if (num_nonbayes_layer < 0): x = Insert_Bayesian_Layer(args, x)
     num_nonbayes_layer -= 1
 
-    x = ResidualBlock(x, filters=4*base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
+    x = ResidualBlock(x, filters=4*new_base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
     # Insert Bayeian Layer, can be mc dropout or mask ensumble layer
     if (num_nonbayes_layer < 0): x = Insert_Bayesian_Layer(args, x)
     num_nonbayes_layer -= 1
 
     # # conv 5
-    x = ResidualBlock(x, filters=8*base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=True)
+    x = ResidualBlock(x, filters=8*new_base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=True)
     # Insert Bayeian Layer, can be mc dropout or mask ensumble layer
     if (num_nonbayes_layer < 0): x = Insert_Bayesian_Layer(args, x)
     num_nonbayes_layer -= 1
 
-    x = ResidualBlock(x, filters=8*base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
+    x = ResidualBlock(x, filters=8*new_base_filters, kernel_size=(3, 3), weight_decay=weight_decay, downsample=False)
     # Insert Bayeian Layer, can be mc dropout or mask ensumble layer
     if (num_nonbayes_layer < 0): x = Insert_Bayesian_Layer(args, x)
     num_nonbayes_layer -= 1

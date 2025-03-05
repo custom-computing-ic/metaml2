@@ -62,7 +62,7 @@ def Qlenet(args, num_layers):
     num_nonbayes_layer = num_layers - args.num_bayes_layer - 1
     # Lenet
     # Convolutional layer  
-    model.add(QConv2D(filters=20, kernel_size=(5,5), input_shape=(28,28,1), padding = "same",
+    model.add(QConv2D(filters=int(20*args.scale_factor), kernel_size=(5,5), input_shape=(28,28,1), padding = "same",
         kernel_quantizer=quantized_bits(args.quant_tbit, args.quant_ibit, alpha=1), bias_quantizer=quantized_bits(args.quant_tbit, args.quant_ibit, alpha=1), name="conv2d_1"))
     model.add(QActivation(activation=quantized_relu(args.quant_tbit), name='relu1'))
     # Max-pooing layer with pooling window size is 2x2
@@ -73,7 +73,7 @@ def Qlenet(args, num_layers):
     num_nonbayes_layer -= 1
 
     # Convolutional layer 
-    model.add(QConv2D(filters=20, kernel_size=(5,5), padding="same",
+    model.add(QConv2D(filters=int(20*args.scale_factor), kernel_size=(5,5), padding="same",
       kernel_quantizer=quantized_bits(args.quant_tbit, args.quant_ibit, alpha=1), bias_quantizer=quantized_bits(args.quant_tbit, args.quant_ibit, alpha=1), name="conv2d_2"))
     model.add(QActivation(activation=quantized_relu(args.quant_tbit), name='relu2'))
     # Max-pooling layer 
@@ -87,7 +87,7 @@ def Qlenet(args, num_layers):
     num_nonbayes_layer -= 1
 
     # The first fully connected layer 
-    model.add(QDense(100, kernel_quantizer=quantized_bits(args.quant_tbit, args.quant_ibit, alpha=1), bias_quantizer=quantized_bits(args.quant_tbit, args.quant_ibit, alpha=1), name="fc_1"))
+    model.add(QDense(int(100*args.scale_factor), kernel_quantizer=quantized_bits(args.quant_tbit, args.quant_ibit, alpha=1), bias_quantizer=quantized_bits(args.quant_tbit, args.quant_ibit, alpha=1), name="fc_1"))
     model.add(QActivation(activation=quantized_relu(args.quant_tbit), name='relu3'))
     # The output layer  
 
@@ -161,24 +161,25 @@ def ResidualBlock(x, filters, kernel_size, block_num, weight_decay, args, downsa
     return out
 
 def QResNet18(classes, input_shape, args, weight_decay=1e-4, base_filters=64):
+    new_base_filters = max(1, int(base_filters * args.scale_factor))
     input = Input(shape=input_shape)
     x = input
     # x = conv2d_bn_relu(x, filters=64, kernel_size=(7, 7), weight_decay=weight_decay, strides=(2, 2))
     # x = MaxPool2D(pool_size=(3, 3), strides=(2, 2),  padding='same')(x)
-    x = conv2d_bn_relu(x, filters=base_filters, kernel_size=(3, 3), block_num=0, weight_decay=weight_decay, args=args, strides=(1, 1))
+    x = conv2d_bn_relu(x, filters=new_base_filters, kernel_size=(3, 3), block_num=0, weight_decay=weight_decay, args=args, strides=(1, 1))
 
     # # conv 2
-    x = ResidualBlock(x, filters=base_filters, kernel_size=(3, 3), block_num=1, weight_decay=weight_decay, args=args, downsample=False)
-    x = ResidualBlock(x, filters=base_filters, kernel_size=(3, 3), block_num=2, weight_decay=weight_decay, args=args, downsample=False)
+    x = ResidualBlock(x, filters=new_base_filters, kernel_size=(3, 3), block_num=1, weight_decay=weight_decay, args=args, downsample=False)
+    x = ResidualBlock(x, filters=new_base_filters, kernel_size=(3, 3), block_num=2, weight_decay=weight_decay, args=args, downsample=False)
     # # conv 3
-    x = ResidualBlock(x, filters=2*base_filters, kernel_size=(3, 3), block_num=3, weight_decay=weight_decay, args=args, downsample=True)
-    x = ResidualBlock(x, filters=2*base_filters, kernel_size=(3, 3), block_num=4, weight_decay=weight_decay, args=args, downsample=False)
+    x = ResidualBlock(x, filters=2*new_base_filters, kernel_size=(3, 3), block_num=3, weight_decay=weight_decay, args=args, downsample=True)
+    x = ResidualBlock(x, filters=2*new_base_filters, kernel_size=(3, 3), block_num=4, weight_decay=weight_decay, args=args, downsample=False)
     # # conv 4
-    x = ResidualBlock(x, filters=4*base_filters, kernel_size=(3, 3), block_num=5, weight_decay=weight_decay, args=args, downsample=True)
-    x = ResidualBlock(x, filters=4*base_filters, kernel_size=(3, 3), block_num=6, weight_decay=weight_decay, args=args, downsample=False)
+    x = ResidualBlock(x, filters=4*new_base_filters, kernel_size=(3, 3), block_num=5, weight_decay=weight_decay, args=args, downsample=True)
+    x = ResidualBlock(x, filters=4*new_base_filters, kernel_size=(3, 3), block_num=6, weight_decay=weight_decay, args=args, downsample=False)
     # # conv 5
-    x = ResidualBlock(x, filters=8*base_filters, kernel_size=(3, 3), block_num=7, weight_decay=weight_decay, args=args, downsample=True)
-    x = ResidualBlock(x, filters=8*base_filters, kernel_size=(3, 3), block_num=8, weight_decay=weight_decay, args=args, downsample=False)
+    x = ResidualBlock(x, filters=8*new_base_filters, kernel_size=(3, 3), block_num=7, weight_decay=weight_decay, args=args, downsample=True)
+    x = ResidualBlock(x, filters=8*new_base_filters, kernel_size=(3, 3), block_num=8, weight_decay=weight_decay, args=args, downsample=False)
     x = AveragePooling2D(pool_size=(4, 4), padding='valid')(x)
     x = Flatten()(x)
     x = Dense(classes)(x)

@@ -48,6 +48,8 @@ from tensorflow_model_optimization.sparsity.keras import strip_pruning
 from tensorflow_model_optimization.python.core.sparsity.keras import pruning_wrapper
 from tensorflow.keras.callbacks import ModelCheckpoint
 
+from keras_flops import get_flops
+
 model_num_layer = {"lenet": 3, "resnet": 3}
 
 def get_dataset(args):
@@ -122,15 +124,17 @@ def get_model(args):
     if args.model_name == "lenet":
         if args.is_quant != 0:
             model = Qlenet(args, model_num_layer[args.model_name])
+            print("load qlenet")
         else:
             model = lenet(args, model_num_layer[args.model_name])
     elif args.model_name == "vibnn": # vibnn is deprecated as we found its permance is very bad in HLS4ML
         model = QVIBNN(args)
     elif args.model_name == "resnet":
         if args.is_quant != 0:
-            model = QResNet18(input_shape=(32, 32, 3), classes=10, args=args, weight_decay=1e-4, base_filters=16)
+            model = QResNet18(input_shape=(32, 32, 3), classes=10, args=args, weight_decay=1e-4, base_filters=64)
+            print("load qresnet")
         else:
-            model = ResNet18(input_shape=(32, 32, 3), classes=10, args=args, weight_decay=1e-4, base_filters=16)
+            model = ResNet18(input_shape=(32, 32, 3), classes=10, args=args, weight_decay=1e-4, base_filters=64)
     elif args.model_name == "vgg":
         if args.is_quant != 0:
             model = QVGG11(args, filters=16, dense_out=[16, 16, 10])
@@ -240,6 +244,7 @@ def keras_pred(args, model, dataset):
     model.model.summary()
     check_sparsity(model.model)
     print("dropout_rate", args.dropout_rate)
+
     model.model  = strip_pruning(model.model)
     #import hls4ml
     #import plotting
@@ -294,9 +299,10 @@ def keras_pred(args, model, dataset):
 
     from sklearn.metrics import accuracy_score
 
-    y_prob        = model.predict(data_dict["x_test"])
-    ece_keras = tfp.stats.expected_calibration_error(num_bins=args.num_bins, 
-        logits=y_prob, labels_true=np.argmax(data_dict["y_test"],axis=1), labels_predicted=np.argmax(y_prob,axis=1))
+    y_prob      = model.predict(data_dict["x_test"])
+    y_logits    = np.log(y_prob/(1-y_prob + 1e-15))
+    ece_keras   = tfp.stats.expected_calibration_error(num_bins=args.num_bins, 
+        logits=y_logits, labels_true=np.argmax(data_dict["y_test"],axis=1), labels_predicted=np.argmax(y_prob,axis=1))
     accuracy_keras = float(accuracy_score (np.argmax(data_dict["y_test"],axis=1), np.argmax(y_prob,axis=1))) 
     entropy_keras = entropy(model.predict(np.ascontiguousarray(x_test_random_full)))
     #entropy_keras = 0
@@ -400,6 +406,7 @@ if __name__ == '__main__':
     parser.add_argument("--seed", default=0, type=int, help="seed")
     parser.add_argument("--num_eval_images", default=200, type=int, help="The number of evaluated images")
     parser.add_argument("--num_bins", default=10, type=int, help="The number of bins while calculating ECE")
+    parser.add_argument("--scale_factor", default=1.0, type=float, help="")
 
     args = parser.parse_args()
 
@@ -428,6 +435,12 @@ if __name__ == '__main__':
         model = load_model(load_model_name, custom_objects=co)
 #    model = Top_Level_Model(args, model)    
 
+
+    flops = get_flops(model, batch_size=1)
+    print(f"FLOPS: {flops / 10 ** 9:.03} G")
+    print(f"FLOPS: {flops}")
+
+    exit(0)
     print("dropout_rate", args.dropout_rate )
     print("pruning_rate", args.p_rate )
     if(args.p_rate!=0.0):

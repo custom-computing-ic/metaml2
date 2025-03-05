@@ -4,13 +4,6 @@ sys.path.append(sys.path[0] + '/..')
 sys.path.append(sys.path[0] + '/../converter/keras')
 sys.path.append(sys.path[0] + '/models')
 
-import os
-import argparse 
-import numpy as np
-import random
-import time
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
 from tensorflow.keras.datasets import mnist, cifar10
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.optimizers import Adam
@@ -23,6 +16,11 @@ from qkeras.utils import _add_supported_quantized_objects
 from tensorflow.keras.utils import to_categorical
 from qkeras import *
 from tensorflow.keras.optimizers import Adam, SGD
+import os
+import argparse 
+import numpy as np
+import random
+import time
 from models import lenet, ResNet18, VGG11
 from converter.keras.MCDropout import MCDropout, BayesianDropout
 from converter.keras.Masksembles import MasksemblesModel, Masksembles
@@ -59,7 +57,6 @@ model_num_layer = {"lenet": 3, "resnet": 3}
 
 def list_of_floats(arg):
     return list(map(float, arg.split(',')))
-
 
 
 #if __name__ == '__main__':
@@ -120,8 +117,6 @@ start_time = time.strftime("%Y%m%d-%H%M%S")
 #    print ("Create Non-exiting Directory")
 args.save_dir = args.save_dir + start_time
 os.makedirs(args.save_dir)
-#ckpt_path = args.save_dir + '/best_chkp.weights.h5'
-ckpt_path = args.save_dir + '/best_chkp.tf'
 
 
 def get_dataset(args):
@@ -220,23 +215,24 @@ def get_model(args):
 def train(args, model, dataset): 
 
     if args.model_name == "lenet" or args.model_name == "vibnn": # vibnn is deprecated as we found its permance is very bad in HLS4ML
-        chkp = ModelCheckpoint(
-            ckpt_path,
-            monitor="val_loss",
-            verbose=1,
-            save_best_only=True,
-            save_weights_only=False,
-            #save_weights_only=True,
-            mode="auto",
-            save_freq="epoch",
-        )
+        #chkp = ModelCheckpoint(
+        #    args.save_dir
+        #    + "/"
+        #    + "best_chkp.tf",
+        #    monitor="val_loss",
+        #    verbose=1,
+        #    save_best_only=True,
+        #    save_weights_only=False,
+        #    mode="auto",
+        #    save_freq="epoch",
+        #)
 
         if args.p_rate != 0.0: 
-            callbacks = [chkp, pruning_callbacks.UpdatePruningStep() ]
-            #callbacks = [pruning_callbacks.UpdatePruningStep() ]
+            #callbacks = [chkp, pruning_callbacks.UpdatePruningStep() ]
+            callbacks = [pruning_callbacks.UpdatePruningStep() ]
         else:
-            callbacks = [chkp]
-            #callbacks = []
+            #callbacks = [chkp]
+            callbacks = []
 
         train_stat = model.fit(
             dataset['x_train'], dataset['y_train'], batch_size=args.batch_size,
@@ -280,21 +276,10 @@ def train(args, model, dataset):
             return new_lr 
         reduce_lr = CosineAnnealingScheduler(T_max=args.num_epoch, eta_max=args.lr, eta_min=1e-4)
 
-        chkp = ModelCheckpoint(
-            ckpt_path,
-            monitor="val_loss",
-            verbose=1,
-            save_best_only=True,
-            save_weights_only=False,
-            #save_weights_only=True,
-            mode="auto",
-            save_freq="epoch",
-        )
-
         if args.p_rate != 0.0: 
-            callbacks = [reduce_lr, chkp,  pruning_callbacks.UpdatePruningStep() ]
+            callbacks = [reduce_lr, pruning_callbacks.UpdatePruningStep() ]
         else:
-            callbacks = [reduce_lr, chkp]
+            callbacks = [reduce_lr]
         history = model.fit_generator(generator=train_gen,
                                            epochs=args.num_epoch,
                                            callbacks=callbacks,
@@ -321,17 +306,13 @@ def keras_pred(args, model, dataset):
             "PruneLowMagnitude": pruning_wrapper.PruneLowMagnitude 
             }
     _add_supported_quantized_objects(co)
-    print("load model from:", ckpt_path)
-    #model.model  = strip_pruning(model.model)
-    #print(ckpt_path)
-    #model.load_weights(ckpt_path)
-    model = load_model(ckpt_path, custom_objects=co)
+    #model = load_model(args.load_model + '.h5', custom_objects=co)
     #model = Top_Level_Model(args, model)
 
     model.model.summary()
     check_sparsity(model.model)
     print("dropout_rate", args.dropout_rate)
-    #model.model  = strip_pruning(model.model)
+    model.model  = strip_pruning(model.model)
 
     from train_qkeras_mcme import get_dataset
     data_dict = get_dataset(args)
@@ -393,6 +374,7 @@ bayesian_output_data = {
     "pruning_rate": [],
     "num_bayes_layer": [], 
     "scale_factor": [],
+    "mc_samples": [],
     "accuracy": [],
     "flops": [],
     "ECE": [],
@@ -414,7 +396,7 @@ ape_base ={
 } 
 
 ece_base ={
-"lenet": 0.03,
+"lenet": 0.05,
 "resnet": 0.09
 } 
 
@@ -438,7 +420,7 @@ w_base = {
 }
 
 
-def black_box_function(dropout_rate, p_rate, num_bayes_layer, scale_factor):
+def black_box_function(dropout_rate, p_rate, num_bayes_layer, scale_factor, mc_samples ):
     def params_discrete(param):
         param = int(param)
         return discrete_options[param]
@@ -454,11 +436,13 @@ def black_box_function(dropout_rate, p_rate, num_bayes_layer, scale_factor):
     #args.dropout_rate = float(dropout_rate)
     #args.p_rate       = float(p_rate) 
     args.num_bayes_layer = params_discrete_layer(num_bayes_layer)
+    args.mc_samples   = int(mc_samples)
     
     print("dropout_rate", args.dropout_rate )
     print("pruning_rate", args.p_rate )
     print("num_bayes_layer", args.num_bayes_layer )
     print("scale_factor", args.scale_factor )
+    print("mc_samples", args.mc_samples )
 
     save_model = args.save_dir + "/" + args.save_model + "_" + f"iter{num_iter}" 
     dataset = get_dataset(args)
@@ -471,21 +455,21 @@ def black_box_function(dropout_rate, p_rate, num_bayes_layer, scale_factor):
         model = Prune_Model(args, model, len(dataset["x_train"]))    
     model = Top_Level_Model(args, model)    
 
-    flops = int(flops * (1 - args.p_rate))
+    flops = int(flops * (1 - args.p_rate)) * args.mc_samples
     print(f"FLOPS after prune: {flops / 10 ** 6:.03} M")
     #exit(0)
 
     train(args, model, dataset)
 
     model.model.summary()
-    #scores = model.evaluate(dataset["x_test"], dataset["y_test"], verbose=0)
-    #print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
-
-    accuracy, ece, ape = keras_pred(args, model, dataset)
-    print("Full dataset, Accuracy Keras:  {}, ECE Keras {}, aPE Keras {}".format(accuracy, ece, ape))
+    scores = model.evaluate(dataset["x_test"], dataset["y_test"], verbose=0)
+    print("%s: %.2f%%" % (model.metrics_names[1], scores[1]*100))
 
     if save_model is not None: 
         model.model.save(save_model+'.h5')
+
+    accuracy, ece, ape = keras_pred(args, model, dataset)
+    print("Full dataset, Accuracy Keras:  {}, ECE Keras {}, aPE Keras {}".format(accuracy, ece, ape))
 
     final_score = float(accuracy / acc_base[args.model_name])   * w_base["acc"] \
                 + float(ape      / ape_base[args.model_name])   * w_base["ape"] \
@@ -518,15 +502,12 @@ def black_box_function(dropout_rate, p_rate, num_bayes_layer, scale_factor):
         args.p_rate,
         args.num_bayes_layer,
         args.scale_factor,
+        args.mc_samples,
         accuracy,
         flops,
         ece,
         ape,
         final_score] 
-
-
-    save_csv_loc = args.save_dir + "/bayesian_opt_" + f"iter{num_iter}.csv"
-    bayesian_output_data.to_csv(save_csv_loc, index=False)
        
     num_iter += 1
     return final_score
@@ -539,6 +520,7 @@ params_nn ={
     #'p_rate'      : (0.1, 0.95) ,
     'num_bayes_layer': (0, len(discrete_layer)-0.001),
     'scale_factor'    : (0, len(discrete_options)-0.001) ,
+    'mc_samples'  : (3, 100-0.001)
 }
 
 optimizer = BOptimize(
@@ -565,6 +547,7 @@ print("dropout_rate:", discrete_options[int(params_nn_['dropout_rate'])])
 print("Pruning_rate:", discrete_options[int(params_nn_['p_rate'])])
 print("Num_bayes_layer:", discrete_layer[int(params_nn_['num_bayes_layer'])] )
 print("scale_factor:",  discrete_options[int(params_nn_['scale_factor'])])
+print("mc_samples:",  int(params_nn_['mc_samples']))
 
 
 
